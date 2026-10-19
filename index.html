@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mi Bot · Visor de operaciones</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root{ --bg:#000000; --pane:#000000; --grid:#1a1a1a; --txt:#c9d4e5; --muted:#8a8a8a;
+         --up:#26c6a6; --dn:#ef5350; --sl:#2979ff; --red:#f2555a; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Segoe UI,Arial,sans-serif;font-size:13px}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;color:#eaf0fa;font-weight:700}
+  .gen{color:var(--muted);font-size:11px}
+  .tabs{display:flex;gap:6px;margin-left:6px}
+  .tab{padding:5px 14px;border:1px solid var(--grid);border-radius:6px;background:#111;color:var(--txt);cursor:pointer;font-weight:600}
+  .tab.active{background:#232323;border-color:#444;color:#eaf3ff}
+  .wrap{display:flex;height:calc(100vh - 52px)}
+  #chart{flex:1;position:relative}
+  aside{width:390px;border-left:1px solid var(--grid);overflow:auto;padding:10px 12px}
+  aside h2{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:6px 0}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:6px 6px;text-align:right;border-bottom:1px solid #16202f;font-size:12px}
+  th{color:var(--muted);font-weight:600;text-align:right}
+  td.l,th.l{text-align:left}
+  tr.trow{cursor:pointer}
+  tr.trow:hover{background:#132135}
+  tr.trow.sel{background:#1b3350}
+  .pos{color:var(--up)} .neg{color:var(--dn)}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700}
+.ztag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;border:1px solid;white-space:nowrap}
+  .buy{background:#12352b;color:#4fe0b6} .sell{background:#3a1f22;color:#ff8a8f}
+  .overlay{position:absolute;top:8px;left:10px;z-index:5;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:230px}
+  .legend{background:rgba(0,0,0,.82);border:1px solid var(--grid);
+          border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.5;pointer-events:none}
+  .legend b{color:#eaf0fa} .sw{display:inline-block;width:10px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+  .hint{color:var(--muted);font-size:11px;margin-top:8px}
+  .indPanel{background:rgba(0,0,0,.82);border:1px solid var(--grid);border-radius:8px;padding:8px 10px;
+            font-size:11.5px;line-height:1.7;pointer-events:auto}
+  .indPanel .indHead{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:4px}
+  .indRow{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;white-space:nowrap}
+  .indRow input{accent-color:#2979ff;cursor:pointer;width:13px;height:13px;flex:none}
+  .indRow .sw{width:10px;height:10px;border-radius:2px;flex:none;margin:0}
+  .asideHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .volverBtn{background:#111;border:1px solid var(--grid);
+             color:#eaf3ff;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer}
+  .volverBtn:hover{background:#1c1c1c;border-color:#444}
+
+  /* --- Resumen / Cartera (estilo Getquin) --- */
+  #summaryView{display:none;height:calc(100vh - 52px);overflow:auto;padding:22px 28px}
+  .sumTop{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;margin-bottom:18px}
+  .sumBig{font-size:38px;font-weight:700;color:#eaf3ff}
+  .sumBig .cur{font-size:16px;color:var(--muted);font-weight:600;margin-left:6px}
+  .sumDelta{font-size:15px;font-weight:700;padding:3px 10px;border-radius:8px}
+  .sumDelta.pos{color:#26c6a6;background:#0f2b24}
+  .sumDelta.neg{color:#ef5350;background:#331414}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0 24px}
+  .kpi{background:#0c0c0c;border:1px solid var(--grid);border-radius:10px;padding:12px 14px}
+  .kpi .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+  .kpi .val{font-size:19px;font-weight:700;color:#eaf3ff}
+  .sumGrid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:22px}
+  .card{background:#0c0c0c;border:1px solid var(--grid);border-radius:10px;padding:14px 16px}
+  .card h3{margin:0 0 12px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  #eqChart{height:220px}
+  #ddChart{height:140px}
+  .sumSection{margin:28px 0 12px}
+  .sumSection h2{font-size:13px;color:#eaf3ff;text-transform:uppercase;letter-spacing:.6px;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--grid)}
+  .donutWrap{display:flex;align-items:center;gap:18px}
+  .donut{width:140px;height:140px;border-radius:50%;flex:none}
+  .donutLeg{font-size:12px;line-height:2}
+  .donutLeg .sw{width:9px;height:9px;border-radius:50%}
+  table.sumTbl{width:100%;border-collapse:collapse;font-size:12px}
+  table.sumTbl th{color:var(--muted);text-align:right;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--grid)}
+  table.sumTbl td{text-align:right;padding:6px 8px;border-bottom:1px solid #141414}
+  table.sumTbl th.l, table.sumTbl td.l{text-align:left}
+  table.sumTbl tr.trow2{cursor:pointer}
+  table.sumTbl tr.trow2:hover{background:#111}
+  .symtag{padding:1px 7px;border-radius:6px;font-size:11px;font-weight:700}
+</style>
+</head>
+<body>
+<header>
+  <h1>Mi Bot · Visor de operaciones</h1>
+  <div class="tabs" id="tabs"></div>
+  <div class="gen" id="gen"></div>
+</header>
+<div class="wrap">
+  <div id="chart">
+    <div class="overlay">
+      <div class="legend" id="legend"></div>
+      <div class="indPanel" id="indPanel">
+        <div class="indHead">Indicadores</div>
+        <label class="indRow"><input type="checkbox" data-ind="zonas"><span class="sw" style="background:linear-gradient(90deg,#3aa0ff,#e8c98f,#ff7ec4,#d8d8d8,#4be04b,#3fae7a)"></span>Zonas horarias</label>
+        <label class="indRow"><input type="checkbox" data-ind="sl"><span class="sw" style="background:#2979ff"></span>Escalera SL</label>
+        <label class="indRow"><input type="checkbox" data-ind="tradeLine"><span class="sw" style="background:rgb(57,255,20)"></span>Línea entrada→salida</label>
+        <label class="indRow"><input type="checkbox" data-ind="markers"><span class="sw" style="background:#ffffff;border-radius:50%"></span>Marcadores apertura/cierre</label>
+        <label class="indRow"><input type="checkbox" data-ind="priceLines"><span class="sw" style="background:#ffd54f"></span>Líneas de precio (SL/Entr/Salida)</label>
+      </div>
+    </div>
+  </div>
+  <aside>
+    <div class="asideHead">
+      <h2>Operaciones</h2>
+      <button id="btnVolver" class="volverBtn" style="display:none">← Vista general</button>
+    </div>
+    <table id="tbl"><thead><tr>
+      <th class="l">#</th><th class="l">Dir</th><th class="l">Zona</th><th>Entrada</th><th>Salida</th><th>P&amp;L</th><th>R</th>
+    </tr></thead><tbody id="tbody"></tbody></table>
+    <div class="hint">La vista general muestra las zonas horarias y la línea de TODAS las operaciones. Clic en una fila para enfocar SOLO esa operación (su línea, su escalera de SL SL0→SLk y zoom); usa "← Vista general" para volver a ver todas. Rueda del mouse = zoom · arrastrar = desplazar.</div>
+    <div id="detail" style="margin-top:12px"></div>
+  </aside>
+</div>
+<div id="summaryView"></div>
+
+<script>document.write('<scr'+'ipt src="data.js?v='+Date.now()+'"><\/scr'+'ipt>');</script>
+<script>
+const D = window.BOT_DATA || {symbols:{}, generado:""};
+document.getElementById('gen').textContent = "datos: " + (D.generado||"");
+const SYMS = Object.keys(D.symbols);
+let curSym = SYMS[0];
+let selTrade = null;
+
+const chartEl = document.getElementById('chart');
+const chart = LightweightCharts.createChart(chartEl, {
+  layout:{ background:{color:'#000000'}, textColor:'#c9d4e5' },
+  grid:{ vertLines:{color:'#141414'}, horzLines:{color:'#141414'} },
+  rightPriceScale:{ borderColor:'#2a2a2a' },
+  timeScale:{ borderColor:'#2a2a2a', timeVisible:true, secondsVisible:false },
+  crosshair:{ mode: LightweightCharts.CrosshairMode.Normal },
+});
+const candle = chart.addCandlestickSeries({
+  upColor:'#26c6a6', downColor:'#ef5350', borderUpColor:'#26c6a6', borderDownColor:'#ef5350',
+  wickUpColor:'#26c6a6', wickDownColor:'#ef5350',
+  // apaga la linea+etiqueta de "ultimo precio" que la libreria dibuja sola por defecto --
+  // no aporta nada sobre el trade y se confundia con las lineas de precio del trade (SL/Entrada/Salida)
+  priceLineVisible:false, lastValueVisible:false
+});
+// Rectangulos semitransparentes de zona horaria: no hay primitiva nativa de rectangulo
+// en esta version de Lightweight Charts, asi que se dibujan como divs HTML posicionados
+// encima del canvas del grafico (coordenadas via timeToCoordinate/priceToCoordinate).
+// IMPORTANTE: el canvas propio de la libreria tiene z-index:2 explicito (confirmado
+// inspeccionando el DOM en vivo) -- un overlay con z-index:auto queda SIEMPRE detras de
+// el sin importar el orden en el HTML, aunque el div exista y tenga contenido (se ve
+// "vacio" pero en realidad esta ahi, tapado). Por eso este div necesita z-index:3
+// explicito (por encima del canvas=2, por debajo del panel de leyenda=5).
+// pointer-events:none deja pasar el mouse hacia el grafico para que zoom/paneo sigan
+// funcionando con normalidad.
+const zoneOverlay = document.createElement('div');
+zoneOverlay.id = 'zoneOverlay';
+zoneOverlay.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:3;';
+chartEl.appendChild(zoneOverlay);
+let zoneSegs = [];   // segmentos de zona horaria de la vista actual (poblado en render(sym))
+const slLine = chart.addLineSeries({ color:'#2979ff', lineWidth:2, lineType:LightweightCharts.LineType.WithSteps, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false });
+// lineas diagonales punteadas de entrada->salida: se ve UNA por cada operacion del
+// simbolo, TODAS a la vez en la vista general (verde=gano, amarillo=perdio). Cada
+// trade tiene su propia serie (no una compartida) para que no se conecten entre si.
+// Se reconstruyen en cada render(sym). Al seleccionar un trade se engrosa su linea
+// para resaltarla entre las demas; al volver a la vista general se afinan de nuevo.
+let tradeLineSeries = [];   // [{series, i}]
+
+// paleta para numerar cada escalon del SL (SL0 rojo -> verde), igual criterio que MT5
+function stepColor(k, n){
+  const red=[242,85,90], amber=[255,209,102], green=[38,224,164];
+  const f = n>1 ? k/(n-1) : 1;
+  const mix=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+  const c = f<0.5 ? mix(red,amber,f/0.5) : mix(amber,green,(f-0.5)/0.5);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+let priceLines = [];   // etiquetas de SL/entrada/salida activas, para poder limpiarlas
+function clearPriceLines(){ priceLines.forEach(pl=>candle.removePriceLine(pl)); priceLines=[]; }
+
+// ---------------- Panel de indicadores (mostrar/ocultar, estilo TradingView) ----------------
+// Estado persistido en localStorage: que indicadores estan activos (por defecto todos ON).
+// Cada checkbox controla su serie de forma independiente via applyOptions({visible}) --
+// esto NO borra los datos, solo los oculta, asi que reactivar es instantaneo sin recalcular nada.
+const IND_DEFAULT = {zonas:true, sl:true, tradeLine:true, markers:true, priceLines:true};
+let indState = IND_DEFAULT;
+try{
+  const saved = JSON.parse(localStorage.getItem('bot_ind_state')||'{}');
+  indState = Object.assign({}, IND_DEFAULT, saved);
+}catch(e){ indState = Object.assign({}, IND_DEFAULT); }
+
+let allMarkers = [];        // set completo de marcadores de apertura/cierre del simbolo actual
+let curPriceLineTrade = null; // ultimo trade cuyas lineas de precio se construyeron, para poder re-togglear
+
+function saveIndState(){ try{ localStorage.setItem('bot_ind_state', JSON.stringify(indState)); }catch(e){} }
+
+// marcadores de apertura/cierre: en la vista general se ven los de TODAS las
+// operaciones; si hay un trade seleccionado, SOLO los de ese trade (igual criterio
+// que la linea entrada->salida, para que la vista de detalle sea de ESE trade y nada mas).
+function applyMarkers(){
+  if(!indState.markers){ candle.setMarkers([]); return; }
+  candle.setMarkers(selTrade===null ? allMarkers : allMarkers.filter(m=>m.idx===selTrade));
+}
+
+function buildPriceLinesFor(t){
+  clearPriceLines();
+  if(!indState.priceLines || !t) return;
+  const n = t.sl_steps.length;
+  const first = t.sl_steps[0];
+  const last  = t.sl_steps[n-1];
+  priceLines.push(candle.createPriceLine({
+    price: first.p, color: stepColor(0, n), lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+    axisLabelVisible: true, title: `SL0  ${fmt(first.p, dg())}`
+  }));
+  if(n > 1){
+    priceLines.push(candle.createPriceLine({
+      price: last.p, color: stepColor(n-1, n), lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+      axisLabelVisible: true, title: `SL${n-1} (último)  ${fmt(last.p, dg())}`
+    }));
+  }
+  priceLines.push(candle.createPriceLine({
+    price: t.entry_p, color:'#c8d2e1', lineWidth:1, lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible:true, title:`Entrada  ${fmt(t.entry_p, dg())}`
+  }));
+  if(t.exit_p){
+    priceLines.push(candle.createPriceLine({
+      price: t.exit_p, color:'#ffd54f', lineWidth:1, lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible:true, title:`Salida  ${fmt(t.exit_p, dg())}`
+    }));
+  }
+}
+
+function applyIndOne(key){
+  if(key==='zonas')      renderZoneOverlay();
+  if(key==='sl')         slLine.applyOptions({visible: indState.sl});
+  if(key==='tradeLine'){
+    // en la vista general se ven TODAS; si hay un trade seleccionado, SOLO la de ese trade
+    if(selTrade===null) tradeLineSeries.forEach(o=>o.series.applyOptions({visible: indState.tradeLine}));
+    else tradeLineSeries.forEach(o=>o.series.applyOptions({visible: (o.i===selTrade) && indState.tradeLine}));
+  }
+  if(key==='markers')    applyMarkers();
+  if(key==='priceLines') buildPriceLinesFor(curPriceLineTrade);
+}
+function applyIndAll(){ Object.keys(IND_DEFAULT).forEach(applyIndOne); }
+
+document.querySelectorAll('#indPanel input[type=checkbox]').forEach(cb=>{
+  const key = cb.dataset.ind;
+  cb.checked = !!indState[key];
+  cb.addEventListener('change', ()=>{
+    indState[key] = cb.checked;
+    saveIndState();
+    applyIndOne(key);
+  });
+});
+applyIndAll();
+
+new ResizeObserver(()=>{ chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight}); renderZoneOverlay(); }).observe(chartEl);
+chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight});
+
+// ---------------- Zonas horarias (mismas 6 zonas y misma regla de DST que el EA) ----------------
+// Replica EXACTA de ICMarketsEnDST/CalcularOffsetLocal/ClasificarCuadro de SMABot_MT5.mq5:
+// servidor IC Markets en GMT+3 (DST activo, 2do domingo de marzo a 1er domingo de noviembre,
+// 02:00 hora servidor) o GMT+2 fuera de DST; Bolivia es UTC-4 fijo, sin DST propio.
+const ZONE_COLOR = {
+  azul:   {line:'#3aa0ff', fill:'rgba(58,160,255,0.16)'},
+  crema:  {line:'#e8c98f', fill:'rgba(232,201,143,0.18)'},
+  rosa:   {line:'#ff7ec4', fill:'rgba(255,126,196,0.16)'},
+  blanco: {line:'#d8d8d8', fill:'rgba(216,216,216,0.13)'},
+  verde1: {line:'#4be04b', fill:'rgba(75,224,75,0.16)'},
+  verde2: {line:'#3fae7a', fill:'rgba(63,174,122,0.16)'},
+};
+function nthSundayUTC(y, monthIdx, nth){
+  const d1 = new Date(Date.UTC(y, monthIdx, 1));
+  const dow = d1.getUTCDay();
+  const firstSunday = 1 + ((7 - dow) % 7);
+  return Date.UTC(y, monthIdx, firstSunday + (nth - 1) * 7);
+}
+// Tabla EXPLICITA de cambios de horario de verano en EE.UU. (que IC Markets sigue en
+// su servidor): [inicio DST = 2do domingo de marzo, fin DST = 1er domingo de
+// noviembre], ambas a las 02:00 hora servidor. Generada y verificada por separado
+// (no es la misma formula que nthSundayUTC, aunque coinciden) para poder auditar cada
+// fecha a simple vista en vez de confiar unicamente en un calculo en vivo.
+const TABLA_DST_NY = {
+  2024: ['2024-03-10', '2024-11-03'], 2025: ['2025-03-09', '2025-11-02'],
+  2026: ['2026-03-08', '2026-11-01'], 2027: ['2027-03-14', '2027-11-07'],
+  2028: ['2028-03-12', '2028-11-05'], 2029: ['2029-03-11', '2029-11-04'],
+  2030: ['2030-03-10', '2030-11-03'], 2031: ['2031-03-09', '2031-11-02'],
+  2032: ['2032-03-14', '2032-11-07'], 2033: ['2033-03-13', '2033-11-06'],
+  2034: ['2034-03-12', '2034-11-05'], 2035: ['2035-03-11', '2035-11-04'],
+  2036: ['2036-03-09', '2036-11-02'], 2037: ['2037-03-08', '2037-11-01'],
+  2038: ['2038-03-14', '2038-11-07'], 2039: ['2039-03-13', '2039-11-06'],
+  2040: ['2040-03-11', '2040-11-04'], 2041: ['2041-03-10', '2041-11-03'],
+  2042: ['2042-03-09', '2042-11-02'], 2043: ['2043-03-08', '2043-11-01'],
+  2044: ['2044-03-13', '2044-11-06'], 2045: ['2045-03-12', '2045-11-05'],
+  2046: ['2046-03-11', '2046-11-04'],
+};
+function icMarketsEnDST(tServerSec){
+  const y = new Date(tServerSec * 1000).getUTCFullYear();
+  const fila = TABLA_DST_NY[y];
+  let inicioDST, finDST;
+  if(fila){
+    inicioDST = Date.parse(fila[0] + 'T02:00:00Z');
+    finDST    = Date.parse(fila[1] + 'T02:00:00Z');
+  } else {
+    // fuera del rango tabulado (2024-2046): respaldo con la formula (2do domingo de
+    // marzo / 1er domingo de noviembre), que da los mismos resultados dentro de ese
+    // rango -- ya verificado -- pero se prefiere la tabla cuando esta disponible.
+    inicioDST = nthSundayUTC(y, 2, 2) + 2 * 3600 * 1000;
+    finDST    = nthSundayUTC(y, 10, 1) + 2 * 3600 * 1000;
+  }
+  const tMs = tServerSec * 1000;
+  return tMs >= inicioDST && tMs < finDST;
+}
+function offsetLocal(tServerSec){ return icMarketsEnDST(tServerSec) ? -7 : -6; }
+// La libreria del grafico (Lightweight Charts) muestra los tiempos extrayendo horas/
+// minutos en UTC del numero que se le da (no convierte a huso horario del navegador).
+// Como los datos vienen en hora del SERVIDOR de IC Markets (que ademas cambia de GMT+2
+// a GMT+3 automaticamente con el horario de verano), hay que "disfrazar" cada tiempo
+// sumandole el offset correspondiente ANTES de dárselo al grafico -- asi lo que la
+// libreria extrae como si fuera UTC es en realidad la hora local de Bolivia. Se usa
+// SIEMPRE que se construye un punto para una serie del grafico (velas, marcadores,
+// lineas, zonas) o para mostrar una hora en texto (fmtT).
+function toChartTime(tServer){ return tServer + offsetLocal(tServer) * 3600; }
+// Las ZONAS de la estrategia estan definidas en hora de NUEVA YORK (son sesiones de
+// mercado: pre-market NY, sesion NY, etc.) -- "para el neoyorquino los horarios de las
+// zonas son siempre los mismos, solo cambian las manecillas del reloj". El servidor de
+// IC Markets tiene una relacion CONSTANTE de -7h con NY (ambos cambian de horario el
+// mismo dia por politica del broker), asi que a diferencia de toChartTime (que usa el
+// offset VARIABLE -6/-7 para mostrar la hora de Bolivia), la clasificacion de zona usa
+// siempre -7 exactas, sin importar el DST. Bolivia ve la zona en el mismo horario que
+// NY durante EDT (coinciden, UTC-4 ambos) y 1 hora mas tarde durante EST (Bolivia no
+// tiene horario de verano, NY si).
+function horaNY(tServerSec){ return tServerSec - 7 * 3600; }
+// CORRECCION del 30-ago-2026: los umbrales originales de bot_engine.py/logica_sma.pdf
+// (azul 02:30, crema 04:30, rosa 06:30, blanco 11:30, verde1 12:30, verde2 22:00 -- en
+// teoria hora NY) estaban corridos 1 hora tarde. Confirmado con TradingView (referencia
+// del usuario): verde1 arranca a las 11:30, no 12:30. Se le resta 60 min a cada umbral.
+function clasificarCuadro(tServerSec){
+  const tLocal = new Date(horaNY(tServerSec) * 1000);
+  const mins = tLocal.getUTCHours() * 60 + tLocal.getUTCMinutes();
+  if(mins >= 90  && mins < 210)  return 'azul';     // 01:30-03:30 NY (antes 02:30-04:30)
+  if(mins >= 210 && mins < 330)  return 'crema';    // 03:30-05:30 NY (antes 04:30-06:30)
+  if(mins >= 330 && mins < 630)  return 'rosa';     // 05:30-10:30 NY (antes 06:30-11:30)
+  if(mins >= 630 && mins < 690)  return 'blanco';   // 10:30-11:30 NY (antes 11:30-12:30)
+  if(mins >= 690 && mins < 1260) return 'verde1';   // 11:30-21:00 NY (antes 12:30-22:00)
+  return 'verde2';
+}
+// 11-oct-2026: etiqueta de color con la ZONA en que ocurrio un momento del trade
+// (misma regla que el EA y que el sombreado del grafico; ts = hora del servidor).
+function zonaTag(ts){
+  if(ts==null) return '<span style="color:var(--muted)">-</span>';
+  const z = clasificarCuadro(ts);
+  const c = (ZONE_COLOR[z] || ZONE_COLOR.verde2).line;
+  return `<span class="ztag" style="color:${c};border-color:${c}">${z}</span>`;
+}
+function computeZoneSegments(candles){
+  const segs = [];
+  let cur = null;
+  let prevT = null;
+  for(const k of candles){
+    const z = clasificarCuadro(k.t);
+    // 11-oct-2026: tambien se corta el segmento si hay un hueco de datos (> 2 h sin velas),
+    // para que una misma zona de dias distintos no se dibuje como un solo rectangulo.
+    const hueco = prevT !== null && (k.t - prevT) > 2 * 3600;
+    prevT = k.t;
+    if(!cur || cur.zone !== z || hueco){
+      if(cur) segs.push(cur);
+      cur = {zone:z, t0:k.t, t1:k.t, lo:k.l, hi:k.h};
+    } else {
+      cur.t1 = k.t;
+      if(k.l < cur.lo) cur.lo = k.l;
+      if(k.h > cur.hi) cur.hi = k.h;
+    }
+  }
+  if(cur) segs.push(cur);
+  // t0/t1 se guardan CONVERTIDOS (toChartTime) porque de aca en mas solo se usan para
+  // ubicar pixeles en el grafico (timeToCoordinate), que ya trabaja con tiempos
+  // convertidos -- la clasificacion de arriba SI necesito que use la hora cruda del
+  // servidor (clasificarCuadro ya aplica su propia conversion internamente para eso).
+  return segs.map(s => ({...s, t0: toChartTime(s.t0), t1: toChartTime(s.t1)}));
+}
+function renderZoneOverlay(){
+  if(!indState.zonas || !zoneSegs.length){ zoneOverlay.innerHTML = ''; return; }
+  const ts = chart.timeScale();
+  const halfBar = (ts.options().barSpacing || 6) / 2;
+  const W = chartEl.clientWidth, H = chartEl.clientHeight;
+  let html = '';
+  for(const seg of zoneSegs){
+    let x0 = ts.timeToCoordinate(seg.t0);
+    let x1 = ts.timeToCoordinate(seg.t1);
+    if(x0===null && x1===null) continue;
+    if(x0===null) x0 = -40; if(x1===null) x1 = W+40;
+    let left = x0 - halfBar, right = x1 + halfBar;
+    if(right < -5 || left > W+5) continue;
+    left = Math.max(left, -5); right = Math.min(right, W+5);
+    const yHi = candle.priceToCoordinate(seg.hi);
+    const yLo = candle.priceToCoordinate(seg.lo);
+    if(yHi===null || yLo===null) continue;
+    const col = ZONE_COLOR[seg.zone] || ZONE_COLOR.verde2;
+    const w = Math.max(1, right - left), h = Math.max(1, yLo - yHi);
+    html += `<div style="position:absolute;left:${left}px;top:${yHi}px;width:${w}px;height:${h}px;`+
+            `background:${col.fill};border:1px solid ${col.line};box-sizing:border-box;pointer-events:none"></div>`;
+    // 11-oct-2026: nombre de la zona en la esquina superior del rectangulo (si cabe)
+    if(w >= 34){
+      const lx = Math.max(left, 2) + 3;
+      const ly = Math.max(yHi - 17, 2);
+      html += `<div style="position:absolute;left:${lx}px;top:${ly}px;font-size:11px;font-weight:700;`+
+              `color:${col.line};background:rgba(0,0,0,.65);padding:0 4px;border-radius:3px;`+
+              `white-space:nowrap;pointer-events:none">${seg.zone}</div>`;
+    }
+  }
+  zoneOverlay.innerHTML = html;
+}
+chart.timeScale().subscribeVisibleTimeRangeChange(renderZoneOverlay);
+
+
+// devuelve el timestamp EXACTO de la vela cuyo periodo contiene "ts" (la vela cuya
+// apertura es <= ts y la siguiente abre despues). Esto hace falta porque el precio de
+// SALIDA (SL tocado) puede ejecutarse en cualquier momento DENTRO de una vela H4, no
+// justo en su apertura -- si se usa el timestamp exacto del deal (distinto, aunque sea
+// por minutos, al de la vela) Lightweight Charts lo coloca en un hueco entre barras en
+// vez de sobre la vela real, y la linea/marcador de salida queda "flotando" fuera de ella.
+function barTimeFor(candles, ts){
+  if(!candles.length) return toChartTime(ts);
+  let lo=0, hi=candles.length-1, ans=candles[0].t;
+  while(lo<=hi){
+    const mid=(lo+hi)>>1;
+    if(candles[mid].t<=ts){ ans=candles[mid].t; lo=mid+1; } else hi=mid-1;
+  }
+  return toChartTime(ans);
+}
+
+function fmt(n,d){ return (n==null)?'–':Number(n).toLocaleString('es',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtT(ts){ if(ts==null) return '–'; const d=new Date(toChartTime(ts)*1000); return d.toISOString().slice(0,16).replace('T',' '); }
+
+function render(sym){
+  curSym = sym; selTrade = null;
+  const S = D.symbols[sym];
+  const cs = S.candles.map(k=>({time:toChartTime(k.t), open:k.o, high:k.h, low:k.l, close:k.c}));
+  candle.setData(cs);
+  zoneSegs = computeZoneSegments(S.candles);
+  slLine.setData([]);           // la escalera de SL solo se ve al seleccionar un trade
+  curPriceLineTrade = null;
+  clearPriceLines();
+  document.getElementById('btnVolver').style.display = 'none';
+  document.getElementById('detail').innerHTML = '<div class="hint">Selecciona una operación de la tabla para ver su detalle y su escalera de SL.</div>';
+
+  // marcadores de ENTRADA (flecha verde/roja, numerada) y de SALIDA (cuadrado blanco,
+  // forma y color bien distintos de la flecha de entrada para que se note donde termina)
+  const mk=[];
+  S.trades.forEach((t,i)=>{
+    const entryBarT = barTimeFor(S.candles, t.entry_t);
+    mk.push({time:entryBarT, position:(t.dir==='compra'?'belowBar':'aboveBar'),
+             color:(t.dir==='compra'?'#26c6a6':'#ef5350'),
+             shape:(t.dir==='compra'?'arrowUp':'arrowDown'), text:'#'+(i+1)+' abre', size:0.8, idx:i});
+    if(t.exit_t){
+      const exitBarT = barTimeFor(S.candles, t.exit_t);
+      mk.push({time:exitBarT, position:(t.dir==='compra'?'aboveBar':'belowBar'),
+               color:'#ffffff', shape:'square', text:'#'+(i+1)+' cierra', size:0.75, idx:i});
+    }
+  });
+  mk.sort((a,b)=>a.time-b.time);
+  allMarkers = mk;
+  applyMarkers();
+
+  // lineas diagonales punteadas de entrada->salida de TODAS las operaciones del simbolo,
+  // vistas a la vez (vista general): una serie por trade para que no se conecten entre si.
+  tradeLineSeries.forEach(o=>{ try{ chart.removeSeries(o.series); }catch(e){} });
+  tradeLineSeries = [];
+  S.trades.forEach((t,i)=>{
+    const entryBarT = barTimeFor(S.candles, t.entry_t);
+    const lastCandleT = S.candles[S.candles.length-1].t;
+    const end = t.exit_t || Math.max(lastCandleT, t.entry_t);
+    const endPrice = t.exit_p ?? S.candles[S.candles.length-1].c;
+    const endBarT = barTimeFor(S.candles, end);
+    const pts = [{time:entryBarT, value:t.entry_p}];
+    if(endBarT > entryBarT) pts.push({time:endBarT, value:endPrice});
+    const isWin = t.pnl >= 0;
+    const s = chart.addLineSeries({
+      color: isWin ? 'rgba(57,255,20,1)' : 'rgba(255,255,0,1)',
+      lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false,
+      visible: indState.tradeLine
+    });
+    s.setData(pts);
+    tradeLineSeries.push({series:s, i, pts});
+  });
+
+  buildTable(S.trades);
+  chart.timeScale().fitContent();
+  renderZoneOverlay();
+  legend(sym, S);
+}
+
+function volverVistaGeneral(){
+  selTrade = null;
+  document.querySelectorAll('tr.trow').forEach(r=>r.classList.remove('sel'));
+  slLine.setData([]);
+  curPriceLineTrade = null;
+  clearPriceLines();
+  // restaurar los datos de TODAS las lineas entrada->salida (al enfocar un trade se vacian
+  // las de los demas para que no estiren el eje de tiempo)
+  tradeLineSeries.forEach(o=>{ o.series.setData(o.pts); o.series.applyOptions({lineWidth:2, visible: indState.tradeLine}); });
+  const S = D.symbols[curSym];
+  const cs = S.candles.map(k=>({time:toChartTime(k.t), open:k.o, high:k.h, low:k.l, close:k.c}));
+  candle.setData(cs);
+  zoneSegs = computeZoneSegments(S.candles);
+  applyMarkers();
+  chart.timeScale().fitContent();
+  renderZoneOverlay();
+  document.getElementById('btnVolver').style.display = 'none';
+  document.getElementById('detail').innerHTML = '<div class="hint">Selecciona una operación de la tabla para ver su detalle y su escalera de SL.</div>';
+}
+document.getElementById('btnVolver').addEventListener('click', volverVistaGeneral);
+
+function legend(sym, S){
+  document.getElementById('legend').innerHTML =
+    `<b>${sym}</b> · ${(()=>{const c=S.candles; const m=c.length>1?Math.round((c[c.length-1].t-c[c.length-2].t)/60):0; return m>=60?('H'+(m/60)):('M'+m);})()} · ${S.candles.length} velas<br>`+
+    `Zonas: <span style="color:#3aa0ff">azul</span> · <span style="color:#e8c98f">crema</span> · <span style="color:#ff7ec4">rosa</span> · <span style="color:#d8d8d8">blanco</span> · <span style="color:#4be04b">verde1</span> · <span style="color:#3fae7a">verde2</span> (hora NY)<br>`+
+    `<span class="sw" style="background:rgb(57,255,20);height:2px;border-bottom:2px dashed rgb(57,255,20)"></span>`+
+    `Línea punteada = entrada → salida de cada operación (verde=ganó, amarillo=perdió)<br>`+
+    `<span style="color:var(--muted)">Clic en una fila para enfocar SOLO esa operación (su línea, su SL y zoom) · `+
+    `botón "← Vista general" junto a la tabla para volver<br>(panel de abajo: mostrar/ocultar cada indicador)</span>`;
+}
+
+function buildTable(trades){
+  const tb = document.getElementById('tbody'); tb.innerHTML='';
+  // se muestra la mas reciente arriba, pero el numero "#" es su orden cronologico real
+  const orden = trades.map((t,i)=>[t,i]).slice().reverse();
+  orden.forEach(([t,i])=>{
+    const risk = Math.abs(t.entry_p - t.sl0);
+    const r = risk>0 ? ((t.dir==='compra'? (( (t.exit_p??cur(t))-t.entry_p)) : (t.entry_p-(t.exit_p??cur(t)))))/risk : 0;
+    const tr = document.createElement('tr');
+    tr.className='trow'; tr.dataset.i=i;
+    const pnlc = t.pnl>=0?'pos':'neg';
+    const est = t.estado==='abierta' ? ' *' : '';
+    tr.innerHTML =
+      `<td class="l">${i+1}${est}</td>`+
+      `<td class="l"><span class="pill ${t.dir==='compra'?'buy':'sell'}">${t.dir==='compra'?'BUY':'SELL'}</span></td>`+
+      `<td class="l" title="${t.logica?('Lógica: '+t.logica+' · '):''}zona de entrada">${zonaTag(t.entry_t)}</td>`+
+      `<td>${fmt(t.entry_p, dg())}</td>`+
+      `<td>${t.exit_p?fmt(t.exit_p,dg()):'abierta'}</td>`+
+      `<td class="${pnlc}">${fmt(t.pnl,2)}</td>`+
+      `<td class="${r>=0?'pos':'neg'}">${fmt(r,2)}</td>`;
+    tr.onclick=()=>selectTrade(i);
+    tb.appendChild(tr);
+  });
+}
+function cur(t){ // precio actual aprox para trade abierto = ultima vela
+  const cs=D.symbols[curSym].candles; return cs[cs.length-1].c;
+}
+// numero de decimales a mostrar, estimado por la magnitud del precio (generico
+// para cualquier simbolo: forex, indices, materias primas, cripto...) en vez de
+// codificar casos particulares por nombre de simbolo.
+function digitsFor(price){
+  const p = Math.abs(price);
+  if(p >= 1000) return 2;
+  if(p >= 100)  return 3;
+  if(p >= 10)   return 4;
+  return 5;
+}
+function dg(){ const cs=D.symbols[curSym].candles; return digitsFor(cs[cs.length-1].c); }
+
+function selectTrade(i){
+  selTrade=i;
+  document.querySelectorAll('tr.trow').forEach(r=>r.classList.toggle('sel', +r.dataset.i===i));
+  const t = D.symbols[curSym].trades[i];
+
+  // marcadores apertura/cierre: SOLO los de esta operacion (no los de todas)
+  applyMarkers();
+
+  // escalera SL (linea escalonada que conecta los puntos, confinada al rango del trade)
+  // -- SOLO aparece cuando el usuario selecciona una operacion, nunca en la vista general.
+  const slPts = t.sl_steps.map(s=>({time:toChartTime(s.t), value:s.p}));
+  // si el SL no se movio en las ultimas velas antes de la salida, el ultimo paso
+  // registrado queda ANTES de la vela de salida y la linea (WithSteps) se corta ahi --
+  // da la impresion de que "el SL no llega a tocar la salida". Se extiende visualmente
+  // con un punto final al mismo precio, en la vela de salida, para que si la toque.
+  const candsForSL = D.symbols[curSym].candles;
+  const endForSL = t.exit_t || Math.max(candsForSL[candsForSL.length-1].t, t.entry_t);
+  const endBarForSL = barTimeFor(candsForSL, endForSL);
+  if(slPts.length && slPts[slPts.length-1].time < endBarForSL){
+    slPts.push({time: endBarForSL, value: slPts[slPts.length-1].value});
+  }
+  slLine.setData(slPts);
+
+  // al seleccionar una operacion se muestra SOLO su linea (las demas, que se ven todas
+  // juntas en la vista general, se ocultan para no confundir con el trade elegido)
+  tradeLineSeries.forEach(o=>{
+    const isSel = o.i===i;
+    // 11-oct-2026: las lineas de los otros trades se VACIAN (no solo se ocultan): ocultas
+    // seguian ocupando lugar en el eje de tiempo y dejaban un hueco vacio al hacer zoom.
+    o.series.setData(isSel ? o.pts : []);
+    o.series.applyOptions({ lineWidth: isSel?4:2, visible: isSel && indState.tradeLine });
+  });
+
+  // --- lineas de precio (SL0, SL actual, Entrada, Salida) -- opcionales via panel ---
+  curPriceLineTrade = t;
+  buildPriceLinesFor(t);
+
+  document.getElementById('btnVolver').style.display = 'block';
+
+  // Auto-enfocar el rango del trade. setVisibleLogicalRange/setVisibleRange de la libreria
+  // resultaron poco fiables: en pruebas repetidas, a veces ignoraban el "from" pedido y
+  // expandian el ancho visible a un valor fijo absurdo (le pase distintos rangos validos
+  // y el resultado real en pantalla quedaba roto la mitad de las veces, sin error en consola).
+  // fitContent() en cambio SIEMPRE funciono bien en decenas de pruebas. Asi que en vez de
+  // pedirle un "zoom" a la libreria, le damos directamente solo los datos de la ventana
+  // del trade (recortados) y dejamos que fitContent() los encuadre -- 100% confiable.
+  const candsFull = D.symbols[curSym].candles;
+  const nC = candsFull.length;
+  const idxAtOrAfter = (ts) => {
+    let lo=0, hi=nC-1, ans=nC-1;
+    while(lo<=hi){ const mid=(lo+hi)>>1; if(candsFull[mid].t>=ts){ans=mid; hi=mid-1;} else lo=mid+1; }
+    return ans;
+  };
+  const iEntry = idxAtOrAfter(t.entry_t);
+  const iEnd   = t.exit_t ? idxAtOrAfter(t.exit_t) : nC-1;
+  const pad = 15;
+  const fromI = Math.max(0, Math.min(iEntry, iEnd) - pad);
+  const toI   = Math.min(nC-1, Math.max(iEntry, iEnd) + pad);
+  const ventana = candsFull.slice(fromI, toI + 1);
+  const ventanaData = ventana.map(k=>({time:toChartTime(k.t), open:k.o, high:k.h, low:k.l, close:k.c}));
+  candle.setData(ventanaData);
+  // OJO: al reducir el dataset de 255 velas a un puñado (ventana), la libreria a veces NO
+  // repinta bien en la primera llamada (queda el grafico en blanco aunque los datos esten
+  // bien) -- confirmado en pruebas. Volver a llamar setData con la MISMA data fuerza el
+  // repintado correcto. Es un workaround, pero 100% reproducible y confiable.
+  candle.setData(ventanaData);
+  // 11-oct-2026: las zonas se recalculan SOLO con las velas visibles de la ventana, para
+  // que cada rectangulo abarque exactamente esas velas (antes usaban el alto/ancho del
+  // dia completo y quedaban desfasadas al hacer zoom).
+  zoneSegs = computeZoneSegments(ventana);
+  chart.timeScale().fitContent();
+  renderZoneOverlay();
+  detail(t, i);
+}
+
+function detail(t, i){
+  const risk = Math.abs(t.entry_p - t.sl0);
+  const px = t.exit_p ?? cur(t);
+  const r = risk>0 ? ((t.dir==='compra'?(px-t.entry_p):(t.entry_p-px))/risk) : 0;
+  const pnlc=t.pnl>=0?'pos':'neg';
+  const n = t.sl_steps.length;
+  const pasos = t.sl_steps.map((s,k)=>
+    `<tr><td class="l" style="color:${stepColor(k,n)}">SL${k}${k===0?' (inicial)':''}</td>`+
+    `<td>${fmt(s.p,dg())}</td><td style="text-align:right;font-size:11px;color:var(--muted)">${fmtT(s.t)}</td></tr>`
+  ).join('');
+  document.getElementById('detail').innerHTML =
+    `<h2>Operación #${i+1}</h2>`+
+    `<table>`+
+    `<tr><td class="l">Símbolo</td><td>${curSym}</td></tr>`+
+    `<tr><td class="l">Dirección</td><td>${t.dir==='compra'?'COMPRA':'VENTA'}</td></tr>`+
+    (t.logica?`<tr><td class="l">Lógica</td><td>${t.logica}</td></tr>`:'')+
+    `<tr><td class="l">Zona de entrada</td><td>${zonaTag(t.entry_t)}</td></tr>`+
+    `<tr><td class="l">${t.exit_t?'Zona de salida':'Zona actual'}</td><td>${t.exit_t?zonaTag(t.exit_t):zonaTag(D.symbols[curSym].candles.slice(-1)[0]?.t)}</td></tr>`+
+    `<tr><td class="l">Lotes</td><td>${fmt(t.lots,2)}</td></tr>`+
+    `<tr><td class="l">Inicio</td><td style="font-size:11px">${fmtT(t.entry_t)}</td></tr>`+
+    `<tr><td class="l">Fin</td><td style="font-size:11px">${t.exit_t?fmtT(t.exit_t):'abierta'}</td></tr>`+
+    `<tr><td class="l">Entrada</td><td>${fmt(t.entry_p,dg())}</td></tr>`+
+    `<tr><td class="l">Salida</td><td>${t.exit_p?fmt(t.exit_p,dg()):'abierta'}</td></tr>`+
+    `<tr><td class="l">P&amp;L neto</td><td class="${pnlc}">${fmt(t.pnl,2)} USD</td></tr>`+
+    `<tr><td class="l">R-múltiplo</td><td class="${r>=0?'pos':'neg'}">${fmt(r,2)} R</td></tr>`+
+    `<tr><td class="l">Estado</td><td>${t.estado}</td></tr>`+
+    (t.mfe!=null?`<tr><td class="l">Máx. a favor (run-up)</td><td class="pos">+${fmt(t.mfe,dg())} (${fmt(t.mfe_pct,2)}%)</td></tr>`:'')+
+    (t.mae!=null?`<tr><td class="l">Máx. en contra (drawdown)</td><td class="neg">-${fmt(t.mae,dg())} (${fmt(t.mae_pct,2)}%)</td></tr>`:'')+
+    `</table>`+
+    (t.bruto!=null?
+    `<h2>Costes de la operación</h2>`+
+    `<table>`+
+    `<tr><td class="l">P&amp;L bruto (precio)</td><td class="${t.bruto>=0?'pos':'neg'}">${fmt(t.bruto,2)} USD</td></tr>`+
+    `<tr><td class="l">Swap</td><td class="${t.swap>=0?'pos':'neg'}">${fmt(t.swap,2)} USD</td></tr>`+
+    `<tr><td class="l">Comisión</td><td class="${t.comision>=0?'pos':'neg'}">${fmt(t.comision,2)} USD</td></tr>`+
+    `<tr><td class="l">P&amp;L neto (= bruto+swap+comisión)</td><td class="${pnlc}">${fmt(t.pnl,2)} USD</td></tr>`+
+    `</table>` : '')+
+    `<h2>Pasos del SL (${n})</h2>`+
+    `<table>${pasos}</table>`;
+}
+
+// ---------------- Resumen / Cartera (estilo Getquin) ----------------
+const PALETTE = ['#ffd54f','#42a5f5','#7c4dff','#26c6a6','#ff7043','#ef5350'];
+function symColor(i){ return PALETTE[i % PALETTE.length]; }
+
+function allTradesCombined(){
+  const rows=[];
+  SYMS.forEach(s=>{
+    (D.symbols[s].trades||[]).forEach((t,idx)=>rows.push({...t, sym:s, idx}));
+  });
+  rows.sort((a,b)=>a.entry_t-b.entry_t);
+  return rows;
+}
+
+function buildSummary(){
+  const cta = D.cuenta || null;
+  const trades = allTradesCombined();
+  const cerradas = trades.filter(t=>t.estado==='cerrada');
+  const abiertas = trades.filter(t=>t.estado!=='cerrada');
+
+  const capIni = cta ? cta.balance_inicial_est : 0;
+  const capAct = cta ? cta.balance_actual : cerradas.reduce((a,t)=>a+t.pnl,0);
+  const moneda = cta ? cta.moneda : 'USD';
+  const pnlTotal = capAct - capIni;
+  const pnlPct = capIni ? (pnlTotal/capIni*100) : 0;
+
+  const wins = cerradas.filter(t=>t.pnl>0), losses = cerradas.filter(t=>t.pnl<=0);
+  const winrate = cerradas.length ? (wins.length/cerradas.length*100) : 0;
+  const sumPos = wins.reduce((a,t)=>a+t.pnl,0), sumNeg = losses.reduce((a,t)=>a+t.pnl,0);
+  const pf = sumNeg!==0 ? (sumPos/Math.abs(sumNeg)) : (sumPos>0?Infinity:0);
+  const avgWin  = wins.length ? sumPos/wins.length : 0;
+  const avgLoss = losses.length ? sumNeg/losses.length : 0;
+  const expectancy = cerradas.length ? (sumPos+sumNeg)/cerradas.length : 0;
+  const best  = cerradas.reduce((a,t)=> (!a||t.pnl>a.pnl)?t:a, null);
+  const worst = cerradas.reduce((a,t)=> (!a||t.pnl<a.pnl)?t:a, null);
+  const avgDurH = cerradas.length ? cerradas.reduce((a,t)=>a+(t.exit_t-t.entry_t),0)/cerradas.length/3600 : 0;
+
+  // curva de equity combinada (solo trades cerradas, ordenadas por cierre)
+  const cronoCierre = cerradas.slice().sort((a,b)=>a.exit_t-b.exit_t);
+  let run = capIni;
+  const eq = [{time: toChartTime((cronoCierre[0]?.entry_t)||0), value: capIni}];
+  const dd = [{time: toChartTime((cronoCierre[0]?.entry_t)||0), value: 0}];
+  let peak=capIni, maxDD=0, maxDDpct=0;
+  // rachas maximas de wins/losses consecutivas (en el orden en que fueron cerrando)
+  let rachaW=0, rachaL=0, maxRachaW=0, maxRachaL=0;
+  cronoCierre.forEach(t=>{
+    run+=t.pnl; eq.push({time:toChartTime(t.exit_t), value:run});
+    peak=Math.max(peak,run);
+    const ddAbs = peak-run; maxDD=Math.max(maxDD,ddAbs);
+    const ddPct = peak>0 ? ddAbs/peak*100 : 0;
+    maxDDpct = Math.max(maxDDpct, ddPct);
+    dd.push({time:toChartTime(t.exit_t), value: -ddPct});
+    if(t.pnl>0){ rachaW++; rachaL=0; } else { rachaL++; rachaW=0; }
+    maxRachaW=Math.max(maxRachaW,rachaW); maxRachaL=Math.max(maxRachaL,rachaL);
+  });
+
+  // Sharpe/Sortino "por operacion": media y desvio de los P&L de cada trade
+  // cerrada (no son los de una serie de retornos diarios como en TradingView,
+  // aqui cada "periodo" es un trade -- por eso se etiquetan distinto en la UI).
+  // Payoff ratio = cuanto se gana en promedio por cada unidad que se pierde.
+  const nR = cerradas.length;
+  const meanR = nR ? cerradas.reduce((a,t)=>a+t.pnl,0)/nR : 0;
+  const varR = nR ? cerradas.reduce((a,t)=>a+Math.pow(t.pnl-meanR,2),0)/nR : 0;
+  const stdR = Math.sqrt(varR);
+  const sharpe = stdR ? meanR/stdR : 0;
+  const downside = cerradas.filter(t=>t.pnl<0);
+  const varDown = downside.length ? downside.reduce((a,t)=>a+Math.pow(t.pnl,2),0)/downside.length : 0;
+  const stdDown = Math.sqrt(varDown);
+  const sortino = stdDown ? meanR/stdDown : (meanR>0?Infinity:0);
+  const payoff = avgLoss!==0 ? Math.abs(avgWin/avgLoss) : (avgWin>0?Infinity:0);
+
+  // costes reales cobrados por el broker (swap + comision) en las operaciones cerradas
+  const totalSwap = cerradas.reduce((a,t)=>a+(t.swap||0),0);
+  const totalComision = cerradas.reduce((a,t)=>a+(t.comision||0),0);
+  const totalCostes = totalSwap + totalComision;
+
+  // desglose Long vs Short (equivalente a las columnas All/Long/Short de TradingView)
+  function statsPara(lista){
+    const w = lista.filter(t=>t.pnl>0), l = lista.filter(t=>t.pnl<=0);
+    const sp = w.reduce((a,t)=>a+t.pnl,0), sn = l.reduce((a,t)=>a+t.pnl,0);
+    return {
+      n: lista.length,
+      winrate: lista.length? w.length/lista.length*100 : 0,
+      pf: sn!==0 ? sp/Math.abs(sn) : (sp>0?Infinity:0),
+      pnl: sp+sn,
+    };
+  }
+  const longShort = {
+    long: statsPara(cerradas.filter(t=>t.dir==='compra')),
+    short: statsPara(cerradas.filter(t=>t.dir==='venta')),
+  };
+
+  // distribucion P&L por simbolo
+  const bySym = SYMS.map((s,i)=>({
+    sym:s, color: symColor(i),
+    pnl: (D.symbols[s].trades||[]).filter(t=>t.estado==='cerrada').reduce((a,t)=>a+t.pnl,0),
+    n: (D.symbols[s].trades||[]).length
+  }));
+
+  renderSummaryHTML({capIni,capAct,moneda,pnlTotal,pnlPct,winrate,pf,maxDD,maxDDpct,
+                      avgWin,avgLoss,expectancy,best,worst,avgDurH,maxRachaW,maxRachaL,
+                      sharpe,sortino,payoff,longShort,totalSwap,totalComision,totalCostes,
+                      nCerradas:cerradas.length, nAbiertas:abiertas.length, eq, dd, bySym, trades});
+}
+
+function donutGradient(bySym){
+  const totalAbs = bySym.reduce((a,b)=>a+Math.abs(b.pnl),0) || 1;
+  let acc=0, stops=[];
+  bySym.forEach(b=>{
+    const pct = Math.abs(b.pnl)/totalAbs*100;
+    stops.push(`${b.color} ${acc}% ${acc+pct}%`);
+    acc+=pct;
+  });
+  if(!stops.length) stops.push('#222 0% 100%');
+  return `conic-gradient(${stops.join(',')})`;
+}
+
+function renderSummaryHTML(S){
+  const el = document.getElementById('summaryView');
+  const pnlClass = S.pnlTotal>=0?'pos':'neg';
+  const deltaClass = S.pnlTotal>=0?'sumDelta pos':'sumDelta neg';
+
+  el.innerHTML = `
+    <div class="sumTop">
+      <div><div class="lbl" style="color:var(--muted);font-size:12px;margin-bottom:4px">CAPITAL ACTUAL</div>
+        <span class="sumBig">${fmt(S.capAct,2)}<span class="cur">${S.moneda}</span></span></div>
+      <div class="${deltaClass}">${S.pnlTotal>=0?'▲':'▼'} ${fmt(Math.abs(S.pnlTotal),2)} ${S.moneda} (${fmt(S.pnlPct,1)}%)</div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Capital inicial</div><div class="val">${fmt(S.capIni,2)} ${S.moneda}</div></div>
+      <div class="kpi"><div class="lbl">Operaciones cerradas</div><div class="val">${S.nCerradas}</div></div>
+      <div class="kpi"><div class="lbl">Abiertas ahora</div><div class="val">${S.nAbiertas}</div></div>
+      <div class="kpi"><div class="lbl">Winrate</div><div class="val">${fmt(S.winrate,1)}%</div></div>
+      <div class="kpi"><div class="lbl">Profit Factor</div><div class="val">${S.pf===Infinity?'∞':fmt(S.pf,2)}</div></div>
+      <div class="kpi"><div class="lbl">Drawdown máx</div><div class="val" style="color:#ef5350">${fmt(S.maxDDpct,1)}%<span style="font-size:11px;color:var(--muted);font-weight:400"> (${fmt(S.maxDD,2)} ${S.moneda})</span></div></div>
+    </div>
+
+    <div class="sumSection"><h2>Visión general</h2></div>
+    <div class="sumGrid">
+      <div class="card"><h3>Evolución del capital</h3><div id="eqChart"></div></div>
+      <div class="card"><h3>P&amp;L por símbolo</h3>
+        <div class="donutWrap">
+          <div class="donut" style="background:${donutGradient(S.bySym)}"></div>
+          <div class="donutLeg">${S.bySym.map(b=>
+            `<div><span class="sw" style="background:${b.color}"></span>${b.sym}: `+
+            `<span class="${b.pnl>=0?'pos':'neg'}">${fmt(b.pnl,2)} ${S.moneda}</span> (${b.n} ops)</div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:22px"><h3>Drawdown (caída desde el máximo)</h3><div id="ddChart"></div></div>
+
+    <div class="sumSection"><h2>Rendimiento</h2></div>
+    <div class="card" style="margin-bottom:22px">
+      <div class="kpis" style="margin:0">
+        <div class="kpi"><div class="lbl">Ganancia media</div><div class="val pos">${fmt(S.avgWin,2)} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Pérdida media</div><div class="val neg">${fmt(S.avgLoss,2)} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Ratio ganancia/pérdida</div><div class="val">${S.payoff===Infinity?'∞':fmt(S.payoff,2)}</div></div>
+        <div class="kpi"><div class="lbl">Expectancia / trade</div><div class="val ${S.expectancy>=0?'pos':'neg'}">${fmt(S.expectancy,2)} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Duración media</div><div class="val">${fmt(S.avgDurH,0)} h</div></div>
+        <div class="kpi"><div class="lbl">Mejor operación</div><div class="val pos">${S.best?fmt(S.best.pnl,2):'–'} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Peor operación</div><div class="val neg">${S.worst?fmt(S.worst.pnl,2):'–'} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Racha máx. ganadora</div><div class="val pos">${S.maxRachaW}</div></div>
+        <div class="kpi"><div class="lbl">Racha máx. perdedora</div><div class="val neg">${S.maxRachaL}</div></div>
+        <div class="kpi"><div class="lbl">Sharpe (por operación)</div><div class="val">${fmt(S.sharpe,2)}</div></div>
+        <div class="kpi"><div class="lbl">Sortino (por operación)</div><div class="val">${S.sortino===Infinity?'∞':fmt(S.sortino,2)}</div></div>
+        <div class="kpi"><div class="lbl">Swap total</div><div class="val ${S.totalSwap>=0?'pos':'neg'}">${fmt(S.totalSwap,2)} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Comisión total</div><div class="val ${S.totalComision>=0?'pos':'neg'}">${fmt(S.totalComision,2)} ${S.moneda}</div></div>
+        <div class="kpi"><div class="lbl">Costes totales</div><div class="val neg">${fmt(S.totalCostes,2)} ${S.moneda}</div></div>
+      </div>
+    </div>
+
+    <div class="sumSection"><h2>Largo vs. corto</h2></div>
+    <div class="card" style="margin-bottom:22px">
+      <table class="sumTbl"><thead><tr>
+        <th class="l">Dirección</th><th>Operaciones</th><th>Winrate</th><th>Profit Factor</th><th>P&amp;L</th>
+      </tr></thead><tbody>
+        <tr><td class="l">COMPRA (long)</td><td>${S.longShort.long.n}</td><td>${fmt(S.longShort.long.winrate,1)}%</td>`+
+          `<td>${S.longShort.long.pf===Infinity?'∞':fmt(S.longShort.long.pf,2)}</td>`+
+          `<td class="${S.longShort.long.pnl>=0?'pos':'neg'}">${fmt(S.longShort.long.pnl,2)} ${S.moneda}</td></tr>
+        <tr><td class="l">VENTA (short)</td><td>${S.longShort.short.n}</td><td>${fmt(S.longShort.short.winrate,1)}%</td>`+
+          `<td>${S.longShort.short.pf===Infinity?'∞':fmt(S.longShort.short.pf,2)}</td>`+
+          `<td class="${S.longShort.short.pnl>=0?'pos':'neg'}">${fmt(S.longShort.short.pnl,2)} ${S.moneda}</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="sumSection"><h2>Historial de operaciones (${S.trades.length})</h2></div>
+    <div class="card">
+      <table class="sumTbl"><thead><tr>
+        <th class="l">Fecha entrada</th><th class="l">Símbolo</th><th class="l">Dir</th>
+        <th class="l">Lógica</th><th class="l">Zona entrada</th><th class="l">Zona salida</th>
+        <th>Entrada</th><th>Salida</th><th>P&amp;L</th><th>R</th><th class="l">Estado</th>
+      </tr></thead><tbody>
+        ${S.trades.slice().reverse().map(t=>{
+          const dgS = digitsFor(t.entry_p);
+          const risk = Math.abs(t.entry_p-t.sl0);
+          const px = t.exit_p ?? (D.symbols[t.sym].candles.slice(-1)[0]?.c ?? t.entry_p);
+          const r = risk>0 ? ((t.dir==='compra'?(px-t.entry_p):(t.entry_p-px))/risk) : 0;
+          return `<tr class="trow2" onclick="jumpTo('${t.sym}',${t.idx})">`+
+            `<td class="l" style="font-size:11px;color:var(--muted)">${fmtT(t.entry_t)}</td>`+
+            `<td class="l"><span class="symtag" style="background:#151515">${t.sym}</span></td>`+
+            `<td class="l"><span class="pill ${t.dir==='compra'?'buy':'sell'}">${t.dir==='compra'?'BUY':'SELL'}</span></td>`+
+            `<td class="l" style="font-size:11px">${t.logica||'-'}</td>`+
+            `<td class="l">${zonaTag(t.entry_t)}</td>`+
+            `<td class="l">${t.exit_t?zonaTag(t.exit_t):'<span style="color:var(--muted)">abierta</span>'}</td>`+
+            `<td>${fmt(t.entry_p,dgS)}</td><td>${t.exit_p?fmt(t.exit_p,dgS):'abierta'}</td>`+
+            `<td class="${t.pnl>=0?'pos':'neg'}">${fmt(t.pnl,2)}</td>`+
+            `<td class="${r>=0?'pos':'neg'}">${fmt(r,2)}</td>`+
+            `<td class="l">${t.estado}</td></tr>`;
+        }).join('')}
+      </tbody></table>
+    </div>
+  `;
+
+  const eqEl = document.getElementById('eqChart');
+  if(window._eqChart){ try{ window._eqChart.remove(); }catch(e){} }
+  const eqChart = LightweightCharts.createChart(eqEl, {
+    layout:{ background:{color:'#000000'}, textColor:'#c9d4e5' },
+    grid:{ vertLines:{color:'#141414'}, horzLines:{color:'#141414'} },
+    rightPriceScale:{ borderColor:'#2a2a2a' },
+    timeScale:{ borderColor:'#2a2a2a', timeVisible:true, secondsVisible:false },
+  });
+  const area = eqChart.addAreaSeries({ lineColor:'#26c6a6', topColor:'rgba(38,198,166,.35)', bottomColor:'rgba(38,198,166,0)', lineWidth:2 });
+  area.setData(S.eq);
+  eqChart.timeScale().fitContent();
+  window._eqChart = eqChart;
+  new ResizeObserver(()=>eqChart.applyOptions({width:eqEl.clientWidth,height:eqEl.clientHeight})).observe(eqEl);
+  eqChart.applyOptions({width:eqEl.clientWidth,height:eqEl.clientHeight});
+
+  const ddEl = document.getElementById('ddChart');
+  if(window._ddChart){ try{ window._ddChart.remove(); }catch(e){} }
+  const ddChart = LightweightCharts.createChart(ddEl, {
+    layout:{ background:{color:'#000000'}, textColor:'#c9d4e5' },
+    grid:{ vertLines:{color:'#141414'}, horzLines:{color:'#141414'} },
+    rightPriceScale:{ borderColor:'#2a2a2a' },
+    timeScale:{ borderColor:'#2a2a2a', timeVisible:true, secondsVisible:false },
+  });
+  const ddArea = ddChart.addAreaSeries({ lineColor:'#ef5350', topColor:'rgba(239,83,80,0)', bottomColor:'rgba(239,83,80,.35)', lineWidth:2 });
+  ddArea.setData(S.dd);
+  ddChart.timeScale().fitContent();
+  window._ddChart = ddChart;
+  new ResizeObserver(()=>ddChart.applyOptions({width:ddEl.clientWidth,height:ddEl.clientHeight})).observe(ddEl);
+  ddChart.applyOptions({width:ddEl.clientWidth,height:ddEl.clientHeight});
+}
+
+function jumpTo(sym, idx){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>{ if(x.textContent===sym) x.classList.add('active'); });
+  showSymbolView();
+  render(sym);
+  selectTrade(idx);
+}
+
+function showSummaryView(){
+  document.querySelector('.wrap').style.display='none';
+  document.getElementById('summaryView').style.display='block';
+  buildSummary();
+}
+function showSymbolView(){
+  document.querySelector('.wrap').style.display='flex';
+  document.getElementById('summaryView').style.display='none';
+  // al volver de "Resumen" el canvas estuvo con display:none (0x0); forzar el
+  // tamano real ahora que el layout ya se recalculo, si no el grafico queda en blanco
+  chart.applyOptions({width:chartEl.clientWidth, height:chartEl.clientHeight});
+}
+
+// tabs: Resumen + simbolos
+const tabs=document.getElementById('tabs');
+const bSum=document.createElement('div'); bSum.className='tab active'; bSum.textContent='Resumen';
+bSum.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); bSum.classList.add('active'); showSummaryView(); };
+tabs.appendChild(bSum);
+
+SYMS.forEach((s,idx)=>{
+  const b=document.createElement('div'); b.className='tab'; b.textContent=s;
+  b.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); showSymbolView(); render(s); };
+  tabs.appendChild(b);
+});
+
+if(SYMS.length){ showSummaryView(); }
+else document.getElementById('legend').textContent = "No hay datos (data.js vacío).";
+</script>
+</body>
+</html>
