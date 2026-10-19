@@ -44,6 +44,8 @@
   .indRow .sw{width:10px;height:10px;border-radius:2px;flex:none;margin:0}
   .toggleOverlayBtn{align-self:flex-start;background:rgba(20,20,20,.9);border:1px solid #444;color:#c9d4e5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;pointer-events:auto;line-height:1.5;transition:background .15s;user-select:none;white-space:nowrap}
   .toggleOverlayBtn:hover{background:rgba(40,40,40,.95);border-color:#555}
+  .toggleAsideBtn{padding:4px 11px;border:1px solid var(--grid);border-radius:6px;background:#111;color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;transition:background .15s;white-space:nowrap;flex-shrink:0}
+  .toggleAsideBtn:hover{background:#1e1e1e;color:var(--txt);border-color:#444}
   .asideHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .volverBtn{background:#111;border:1px solid var(--grid);
              color:#eaf3ff;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer}
@@ -86,6 +88,7 @@
   <h1>Mi Bot · Visor de operaciones</h1>
   <div class="tabs" id="tabs"></div>
   <div class="gen" id="gen"></div>
+  <button class="toggleAsideBtn" id="toggleAsideBtn" title="Mostrar/ocultar panel operaciones">Operaciones ▶</button>
 </header>
 <div class="wrap">
   <div id="chart">
@@ -952,6 +955,28 @@ SYMS.forEach((s,idx)=>{
 
 if(SYMS.length){ showSummaryView(); }
 else document.getElementById('legend').textContent = "No hay datos (data.js vacío).";
+
+// ── Toggle panel lateral (aside) ─────────────────────────────────────────
+(function(){
+  const btn = document.getElementById('toggleAsideBtn');
+  const panel = document.querySelector('aside');
+  let hidden = false;
+  try { hidden = localStorage.getItem('asideHidden') === '1'; } catch(e){}
+
+  function applyAside(){
+    panel.style.display = hidden ? 'none' : '';
+    btn.textContent = hidden ? 'Operaciones ◀' : 'Operaciones ▶';
+    btn.title = hidden ? 'Mostrar panel operaciones' : 'Ocultar panel operaciones';
+  }
+
+  applyAside();
+
+  btn.addEventListener('click', function(){
+    hidden = !hidden;
+    try { localStorage.setItem('asideHidden', hidden ? '1' : '0'); } catch(e){}
+    applyAside();
+  });
+})();
 
 // ── Toggle paneles overlay ────────────────────────────────────────────────
 (function(){
