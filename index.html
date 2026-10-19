@@ -105,7 +105,7 @@
       </div>
     </div>
   </div>
-  <aside>
+  <aside id="sidePanel">
     <div class="asideHead">
       <h2>Operaciones</h2>
       <button id="btnVolver" class="volverBtn" style="display:none">← Vista general</button>
@@ -959,12 +959,12 @@ else document.getElementById('legend').textContent = "No hay datos (data.js vac�
 // ── Toggle panel lateral (aside) ─────────────────────────────────────────
 (function(){
   const btn = document.getElementById('toggleAsideBtn');
-  const panel = document.querySelector('aside');
+  const panel = document.getElementById('sidePanel');
   let hidden = false;
   try { hidden = localStorage.getItem('asideHidden') === '1'; } catch(e){}
 
   function applyAside(){
-    panel.style.display = hidden ? 'none' : '';
+    panel.style.display = hidden ? 'none' : 'block';
     btn.textContent = hidden ? 'Operaciones ◀' : 'Operaciones ▶';
     btn.title = hidden ? 'Mostrar panel operaciones' : 'Ocultar panel operaciones';
   }
