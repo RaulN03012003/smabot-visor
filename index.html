@@ -936,6 +936,8 @@ function showSummaryView(){
 function showSymbolView(){
   document.querySelector('.wrap').style.display='flex';
   document.getElementById('summaryView').style.display='none';
+  // respetar estado del toggle de aside
+  (function(){ try{ var h=localStorage.getItem('asideHidden')==='1'; var p=document.getElementById('sidePanel'); if(p) p.style.display=h?'none':'block'; }catch(e){} })();
   // al volver de "Resumen" el canvas estuvo con display:none (0x0); forzar el
   // tamano real ahora que el layout ya se recalculo, si no el grafico queda en blanco
   chart.applyOptions({width:chartEl.clientWidth, height:chartEl.clientHeight});
