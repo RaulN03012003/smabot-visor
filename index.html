@@ -964,12 +964,19 @@ else document.getElementById('legend').textContent = "No hay datos (data.js vac�
 // ── Toggle panel lateral (aside) ─────────────────────────────────────────
 (function(){
   const btn = document.getElementById('toggleAsideBtn');
-  const panel = document.getElementById('sidePanel');
+  // usar querySelector como fallback robusto
+  const panel = document.getElementById('sidePanel') || document.querySelector('aside');
   let hidden = false;
   try { hidden = localStorage.getItem('asideHidden') === '1'; } catch(e){}
 
   function applyAside(){
-    panel.style.display = hidden ? 'none' : 'block';
+    if(!panel) return;
+    if(hidden){
+      panel.style.setProperty('display','none','important');
+    } else {
+      panel.style.removeProperty('display');
+      panel.style.setProperty('display','block','important');
+    }
     btn.textContent = hidden ? 'Operaciones ◀' : 'Operaciones ▶';
     btn.title = hidden ? 'Mostrar panel operaciones' : 'Ocultar panel operaciones';
   }
@@ -981,6 +988,15 @@ else document.getElementById('legend').textContent = "No hay datos (data.js vac�
     try { localStorage.setItem('asideHidden', hidden ? '1' : '0'); } catch(e){}
     applyAside();
   });
+
+  // re-aplicar cada vez que showSymbolView cambie el wrap
+  const wrap = document.querySelector('.wrap');
+  if(wrap){
+    const obs = new MutationObserver(function(){
+      if(wrap.style.display !== 'none') applyAside();
+    });
+    obs.observe(wrap, {attributes:true, attributeFilter:['style']});
+  }
 })();
 
 // ── Toggle paneles overlay ────────────────────────────────────────────────
