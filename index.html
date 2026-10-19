@@ -42,7 +42,7 @@
   .indRow{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;white-space:nowrap}
   .indRow input{accent-color:#2979ff;cursor:pointer;width:13px;height:13px;flex:none}
   .indRow .sw{width:10px;height:10px;border-radius:2px;flex:none;margin:0}
-  .toggleOverlayBtn{align-self:flex-start;background:rgba(20,20,20,.9);border:1px solid #444;color:#c9d4e5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;pointer-events:auto;line-height:1.5;transition:background .15s;user-select:none;white-space:nowrap}
+  .toggleOverlayBtn{position:absolute;top:8px;left:10px;z-index:10;background:rgba(20,20,20,.92);border:1px solid #555;color:#c9d4e5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;pointer-events:auto;line-height:1.5;transition:background .15s;user-select:none;white-space:nowrap}
   .toggleOverlayBtn:hover{background:rgba(40,40,40,.95);border-color:#555}
   .toggleAsideBtn{padding:4px 11px;border:1px solid var(--grid);border-radius:6px;background:#111;color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;transition:background .15s;white-space:nowrap;flex-shrink:0}
   .toggleAsideBtn:hover{background:#1e1e1e;color:var(--txt);border-color:#444}
@@ -92,8 +92,8 @@
 </header>
 <div class="wrap">
   <div id="chart">
+    <button class="toggleOverlayBtn" id="toggleOverlayBtn" title="Mostrar/ocultar paneles">◀ ocultar</button>
     <div class="overlay" id="overlayPanels">
-      <button class="toggleOverlayBtn" id="toggleOverlayBtn" title="Mostrar/ocultar paneles">◀ ocultar</button>
       <div class="legend" id="legend"></div>
       <div class="indPanel" id="indPanel">
         <div class="indHead">Indicadores</div>
@@ -986,9 +986,10 @@ else document.getElementById('legend').textContent = "No hay datos (data.js vac�
   try { hidden = localStorage.getItem('overlayHidden') === '1'; } catch(e){}
 
   function applyState(){
-    // ocultar solo legend e indPanel, no el propio botón
     document.getElementById('legend').style.display = hidden ? 'none' : '';
     document.getElementById('indPanel').style.display = hidden ? 'none' : '';
+    // cuando visible, bajar el overlay para no tapar el botón (34px)
+    document.getElementById('overlayPanels').style.top = hidden ? '8px' : '42px';
     btn.textContent = hidden ? '▶ mostrar' : '◀ ocultar';
     btn.title = hidden ? 'Mostrar paneles' : 'Ocultar paneles';
   }
