@@ -42,6 +42,8 @@
   .indRow{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;white-space:nowrap}
   .indRow input{accent-color:#2979ff;cursor:pointer;width:13px;height:13px;flex:none}
   .indRow .sw{width:10px;height:10px;border-radius:2px;flex:none;margin:0}
+  .toggleOverlayBtn{position:absolute;top:8px;left:10px;z-index:6;background:rgba(0,0,0,.75);border:1px solid #333;color:#c9d4e5;border-radius:6px;padding:3px 9px;font-size:13px;cursor:pointer;pointer-events:auto;display:none;line-height:1.5;transition:background .15s}
+  .toggleOverlayBtn:hover{background:rgba(40,40,40,.95);border-color:#555}
   .asideHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .volverBtn{background:#111;border:1px solid var(--grid);
              color:#eaf3ff;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer}
@@ -87,7 +89,8 @@
 </header>
 <div class="wrap">
   <div id="chart">
-    <div class="overlay">
+    <button class="toggleOverlayBtn" id="toggleOverlayBtn" title="Mostrar/ocultar paneles">◀</button>
+    <div class="overlay" id="overlayPanels">
       <div class="legend" id="legend"></div>
       <div class="indPanel" id="indPanel">
         <div class="indHead">Indicadores</div>
@@ -949,6 +952,30 @@ SYMS.forEach((s,idx)=>{
 
 if(SYMS.length){ showSummaryView(); }
 else document.getElementById('legend').textContent = "No hay datos (data.js vacío).";
+
+// ── Toggle paneles overlay ────────────────────────────────────────────────
+(function(){
+  const btn = document.getElementById('toggleOverlayBtn');
+  const panels = document.getElementById('overlayPanels');
+  let hidden = false;
+  try { hidden = localStorage.getItem('overlayHidden') === '1'; } catch(e){}
+
+  function applyState(){
+    panels.style.display = hidden ? 'none' : '';
+    btn.textContent = hidden ? '▶' : '◀';
+    btn.title = hidden ? 'Mostrar paneles' : 'Ocultar paneles';
+  }
+
+  // Mostrar el botón toggle siempre visible
+  btn.style.display = 'block';
+  applyState();
+
+  btn.addEventListener('click', function(){
+    hidden = !hidden;
+    try { localStorage.setItem('overlayHidden', hidden ? '1' : '0'); } catch(e){}
+    applyState();
+  });
+})();
 </script>
 </body>
 </html>
