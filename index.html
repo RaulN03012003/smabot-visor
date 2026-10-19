@@ -20,8 +20,8 @@
   .tab{padding:5px 14px;border:1px solid var(--grid);border-radius:6px;background:#111;color:var(--txt);cursor:pointer;font-weight:600}
   .tab.active{background:#232323;border-color:#444;color:#eaf3ff}
   .wrap{display:flex;height:calc(100vh - 52px)}
-  #chart{flex:1;position:relative}
-  aside{width:390px;border-left:1px solid var(--grid);overflow:auto;padding:10px 12px}
+  #chart{flex:1;position:relative;min-width:0;overflow:hidden}
+  aside{flex:none;width:390px;border-left:1px solid var(--grid);overflow:auto;padding:10px 12px}
   aside h2{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:6px 0}
   table{width:100%;border-collapse:collapse}
   th,td{padding:6px 6px;text-align:right;border-bottom:1px solid #16202f;font-size:12px}
@@ -939,8 +939,6 @@ function showSummaryView(){
 function showSymbolView(){
   document.querySelector('.wrap').style.display='flex';
   document.getElementById('summaryView').style.display='none';
-  // respetar estado del toggle de aside
-  (function(){ try{ var h=localStorage.getItem('asideHidden')==='1'; var p=document.getElementById('sidePanel'); if(p) p.style.display=h?'none':'block'; }catch(e){} })();
   // al volver de "Resumen" el canvas estuvo con display:none (0x0); forzar el
   // tamano real ahora que el layout ya se recalculo, si no el grafico queda en blanco
   chart.applyOptions({width:chartEl.clientWidth, height:chartEl.clientHeight});
@@ -964,39 +962,20 @@ else document.getElementById('legend').textContent = "No hay datos (data.js vac�
 // ── Toggle panel lateral (aside) ─────────────────────────────────────────
 (function(){
   const btn = document.getElementById('toggleAsideBtn');
-  // usar querySelector como fallback robusto
-  const panel = document.getElementById('sidePanel') || document.querySelector('aside');
+  const panel = document.getElementById('sidePanel');
   let hidden = false;
   try { hidden = localStorage.getItem('asideHidden') === '1'; } catch(e){}
-
   function applyAside(){
-    if(!panel) return;
-    if(hidden){
-      panel.style.setProperty('display','none','important');
-    } else {
-      panel.style.removeProperty('display');
-      panel.style.setProperty('display','block','important');
-    }
+    panel.style.display = hidden ? 'none' : '';
     btn.textContent = hidden ? 'Operaciones ◀' : 'Operaciones ▶';
     btn.title = hidden ? 'Mostrar panel operaciones' : 'Ocultar panel operaciones';
   }
-
   applyAside();
-
   btn.addEventListener('click', function(){
     hidden = !hidden;
     try { localStorage.setItem('asideHidden', hidden ? '1' : '0'); } catch(e){}
     applyAside();
   });
-
-  // re-aplicar cada vez que showSymbolView cambie el wrap
-  const wrap = document.querySelector('.wrap');
-  if(wrap){
-    const obs = new MutationObserver(function(){
-      if(wrap.style.display !== 'none') applyAside();
-    });
-    obs.observe(wrap, {attributes:true, attributeFilter:['style']});
-  }
 })();
 
 // ── Toggle paneles overlay ────────────────────────────────────────────────
